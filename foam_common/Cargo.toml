@@ -1,8 +1,6 @@
 [package]
-name = "foam_psp"
+name = "foam_common"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-psp.workspace = true
-foam_common.workspace = true

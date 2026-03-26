@@ -19,10 +19,15 @@ name = "foam"
 version = "0.1.0"
 dependencies = [
  "cfg_aliases",
+ "foam_common",
  "foam_proc_macro",
  "foam_psp",
  "psp",
 ]
+
+[[package]]
+name = "foam_common"
+version = "0.1.0"
 
 [[package]]
 name = "foam_proc_macro"
@@ -37,6 +42,7 @@ dependencies = [
 name = "foam_psp"
 version = "0.1.0"
 dependencies = [
+ "foam_common",
  "psp",
 ]
 
