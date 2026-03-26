@@ -1,0 +1,4 @@
+{
+  outputs =_:
+    import ./. {    };
+}
