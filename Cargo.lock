@@ -20,6 +20,7 @@ version = "0.1.0"
 dependencies = [
  "cfg_aliases",
  "foam_proc_macro",
+ "foam_psp",
  "psp",
 ]
 
@@ -30,6 +31,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "foam_psp"
+version = "0.1.0"
+dependencies = [
+ "psp",
 ]
 
 [[package]]

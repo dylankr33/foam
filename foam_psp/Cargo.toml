@@ -1,0 +1,7 @@
+[package]
+name = "foam_psp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+psp.workspace = true

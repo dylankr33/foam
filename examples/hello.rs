@@ -1,8 +1,7 @@
 #![cfg_attr(target_os = "psp", no_std)]
 #![cfg_attr(target_os = "psp", no_main)]
 
-use foam::lprintln;
-use foam_proc_macro::{cfg_retro, foam_main};
+use foam::{App, cfg_retro, foam_main, lprintln};
 
 #[cfg_retro]
 use alloc::vec;
@@ -16,4 +15,7 @@ fn main() {
     for i in people {
         lprintln!("It's {}", i)
     }
+    let app = App::new() else {
+        panic!("diddy foid");
+    };
 }

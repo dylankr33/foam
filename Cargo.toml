@@ -5,20 +5,23 @@ edition = "2024"
 
 [dependencies]
 foam_proc_macro = {workspace = true}
-psp = "0.3.12"
+foam_psp.workspace = true
+psp.workspace = true
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
 
 [workspace]
-members = ["foam_proc_macro"]
+members = ["foam_proc_macro", "foam_psp"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
+psp = "0.3.12"
+foam_proc_macro.path = "foam_proc_macro"
+foam_psp.path = "foam_psp"
 proc-macro2 = "1.0.2"
-foam_proc_macro = { path = "foam_proc_macro"}
 quote = "1.0.45"
 syn = { version = "2.0.117", features = ["visit-mut", "full"] }
