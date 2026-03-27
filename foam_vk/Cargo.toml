@@ -5,6 +5,6 @@ edition.workspace = true
 
 [dependencies]
 foam_common.workspace = true
-ash.workspace = true
+kazan.workspace = true
 winit.workspace = true
 pretty_env_logger.workspace = true

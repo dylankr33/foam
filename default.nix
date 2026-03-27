@@ -63,6 +63,8 @@
           cargo-psp
           ppsspp
           vulkan-tools
+          vulkan-loader
+          vulkan-validation-layers
         ];
       };
     };

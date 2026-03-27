@@ -44,6 +44,17 @@ pub struct App {
 
 impl App {
     pub fn new(game: Box<dyn EventHandler>) -> Result<Self, Box<dyn Error>> {
+        #[cfg(any(windows, unix))]
+        let (event_loop, window) = {
+            use winit::dpi::LogicalSize;
+
+            let event_loop = EventLoop::new()?;
+            let window = WindowBuilder::new()
+                .with_title("Foam App")
+                .with_inner_size(LogicalSize::new(800, 800))
+                .build(&event_loop)?;
+            (event_loop, window)
+        };
         let renderer = {
             #[cfg(target_os = "psp")]
             {
@@ -55,24 +66,13 @@ impl App {
             {
                 pretty_env_logger::init();
 
-                let renderer = foam_vk::VkApp::new()?;
+                let renderer = foam_vk::VkApp::new(&window)?;
                 renderer
             }
             #[cfg(not(any(target_os = "psp", windows, unix)))]
             {
                 todo!()
             }
-        };
-        #[cfg(any(windows, unix))]
-        let (event_loop, window) = {
-            use winit::dpi::LogicalSize;
-
-            let event_loop = EventLoop::new()?;
-            let window = WindowBuilder::new()
-                .with_title("Foam App")
-                .with_inner_size(LogicalSize::new(800, 800))
-                .build(&event_loop)?;
-            (event_loop, window)
         };
         Ok(App {
             game,

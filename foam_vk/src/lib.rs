@@ -1,50 +1,96 @@
-use std::{error::Error, ffi::CString};
+use std::{
+    borrow::Cow,
+    error::Error,
+    ffi::{self, CString},
+    os::raw::c_char,
+};
 
-use ash::{self, vk};
 use foam_common::{Event, FoamRenderer};
+use kazan::{
+    LoadInstanceFn,
+    vk::{self, vk1_0},
+};
+use winit::{raw_window_handle::HasDisplayHandle, window::Window};
 
-unsafe extern "system" fn vulkan_debug_utils_cb(
-    severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+unsafe extern "system" fn vulkan_debug_callback(
+    message_severity: vk::DebugUtilsMessageSeverityFlagBitsEXT,
     message_type: vk::DebugUtilsMessageTypeFlagsEXT,
-    cb_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
-    _data: *mut std::ffi::c_void,
+    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT<'_>,
+    _user_data: *mut std::os::raw::c_void,
 ) -> vk::Bool32 {
-    let message = unsafe { std::ffi::CStr::from_ptr((*cb_data).p_message) };
-    let severity = format!("{:?}", severity).to_lowercase();
-    let ty = format!("{:?}", message_type).to_lowercase();
-    println!("[Debug][{}][{}] {:?}", severity, ty, message);
+    let callback_data = unsafe { *p_callback_data };
+    let message_id_number = callback_data.message_id_number;
+
+    let message_id_name = if callback_data.p_message_id_name.is_null() {
+        Cow::from("")
+    } else {
+        unsafe { ffi::CStr::from_ptr(callback_data.p_message_id_name).to_string_lossy() }
+    };
+
+    let message = if callback_data.p_message.is_null() {
+        Cow::from("")
+    } else {
+        unsafe { ffi::CStr::from_ptr(callback_data.p_message).to_string_lossy() }
+    };
+
+    println!(
+        "{message_severity:?}:\n{message_type:?} [{message_id_name} ({message_id_number})] : {message}\n",
+    );
+
     vk::FALSE
 }
 
 pub struct VkApp {
-    instance: ash::Instance,
+    pub entry: kazan::Entry,
+    pub instance: vk::Instance,
+    pub instance_fn: vk1_0::InstanceFn,
+    pub debug_callback: vk::DebugUtilsMessengerEXT, //pub device: vk::Device,
 }
 
 impl VkApp {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
-        let entry = unsafe { ash::Entry::load()? };
-        let engine_name = CString::new("foam_vk")?;
-        let app_name = CString::new("Foam App")?;
-        let app_info = vk::ApplicationInfo {
-            p_application_name: app_name.as_ptr(),
-            p_engine_name: engine_name.as_ptr(),
-            api_version: vk::make_api_version(1, 0, 106, 0),
-            ..Default::default()
-        };
-        let layer_names: Vec<CString> = vec![CString::new("VK_LAYER_KHRONOS_validation")?];
-        let layer_names_ptrs: Vec<*const i8> = layer_names.iter().map(|i| i.as_ptr()).collect();
-        let extension_name_ptrs: Vec<*const i8> = vec![ash::ext::debug_utils::NAME.as_ptr()];
-        let instance_create_info = vk::InstanceCreateInfo {
-            p_application_info: &app_info,
-            pp_enabled_extension_names: extension_name_ptrs.as_ptr(),
-            enabled_extension_count: extension_name_ptrs.len() as u32,
-            pp_enabled_layer_names: layer_names_ptrs.as_ptr(),
-            enabled_layer_count: layer_names_ptrs.len() as u32,
-
-            ..Default::default()
-        };
-        let instance = unsafe { entry.create_instance(&instance_create_info, None)? };
-        Ok(Self { instance })
+    pub fn new(window: &Window) -> Result<Self, Box<dyn Error>> {
+        let entry = kazan::Entry::linked()?;
+        let app_name = c"Foam App";
+        let layer_names = [c"VK_LAYER_KHRONOS_validation"];
+        let layer_names_raw: Vec<*const c_char> = layer_names.iter().map(|f| f.as_ptr()).collect();
+        let display_handle = window.display_handle()?.as_raw();
+        let required = kazan::window::required_extensions(display_handle)?;
+        #[allow(unused_mut)]
+        let mut extension_names: Vec<*const c_char> =
+            required.names().map(|n| n.as_ptr()).collect();
+        let app_info = vk::ApplicationInfo::default()
+            .application_name(app_name)
+            .application_version(0)
+            .engine_name(c"foam_vk")
+            .engine_version(0)
+            .api_version(vk1_0::API_VERSION);
+        let create_info = vk::InstanceCreateInfo::default()
+            .application_info(&app_info)
+            .enabled_extension_names(&extension_names)
+            .enabled_layer_names(&layer_names_raw);
+        let instance = unsafe { entry.vk1_0.create_instance(&create_info, None)? };
+        let instance_fn = unsafe { vk1_0::InstanceFn::load(&entry, instance)? };
+        let debug_info = vk::DebugUtilsMessengerCreateInfoEXT::default()
+            .message_severity(
+                vk::DebugUtilsMessageSeverityFlagBitsEXT::ERROR_EXT
+                    | vk::DebugUtilsMessageSeverityFlagBitsEXT::WARNING_EXT
+                    | vk::DebugUtilsMessageSeverityFlagBitsEXT::INFO_EXT,
+            )
+            .message_type(
+                vk::DebugUtilsMessageTypeFlagBitsEXT::GENERAL_EXT
+                    | vk::DebugUtilsMessageTypeFlagBitsEXT::VALIDATION_EXT
+                    | vk::DebugUtilsMessageTypeFlagBitsEXT::PERFORMANCE_EXT,
+            )
+            .pfn_user_callback(vulkan_debug_callback);
+        let debug_utils_fn = unsafe { vk::ext::debug_utils::InstanceFn::load(&entry, instance)? };
+        let debug_callback =
+            unsafe { debug_utils_fn.create_debug_utils_messenger(instance, &debug_info, None)? };
+        Ok(Self {
+            entry,
+            instance,
+            instance_fn,
+            debug_callback,
+        })
     }
 }
 
@@ -60,8 +106,7 @@ impl FoamRenderer for VkApp {
 
 impl Drop for VkApp {
     fn drop(&mut self) {
-        unsafe {
-            self.instance.destroy_instance(None);
-        }
+        #[allow(unused_unsafe)]
+        unsafe {}
     }
 }

@@ -1,0 +1,18 @@
+[package]
+name = "foam"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+foam_proc_macro = {workspace = true}
+foam_common.workspace = true
+
+[target.'cfg(target_os = "psp")'.dependencies]
+psp.workspace = true
+foam_psp.workspace = true
+
+[target.'cfg(any(windows,unix))'.dependencies]
+pretty_env_logger.workspace = true
+winit.workspace = true
+foam_vk.workspace = true
+foam_common.workspace = true

@@ -3,7 +3,7 @@
 
 use foam::{
     App, Button, Event, EventHandler, foam_main,
-    platform::{Box, Vec},
+    platform::{Box, Error, Vec},
 };
 
 #[derive(Default)]
@@ -36,8 +36,9 @@ impl EventHandler for Game {
 }
 
 #[foam_main]
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let game = Box::new(Game::default());
-    let mut app = App::new(game).expect("Couldn't create app!");
-    app.run();
+    let app = App::new(game)?;
+    app.run()?;
+    Ok(())
 }
