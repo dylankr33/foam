@@ -1,0 +1,10 @@
+[package]
+name = "foam_vk"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+foam_common.workspace = true
+ash.workspace = true
+winit.workspace = true
+pretty_env_logger.workspace = true
