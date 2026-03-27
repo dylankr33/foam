@@ -2,14 +2,13 @@
 
 use core::{error::Error, ffi::c_void};
 
-use alloc::boxed::Box;
-use foam_common::FoamRenderer;
+use alloc::{boxed::Box, vec::Vec};
+use foam_common::{Button, Event, FoamRenderer, rgb_to_abgr};
 use psp::{
     BUF_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH,
-    sys::{self, GuState, sceGuColor, sceGuDrawArray, sceGuGetMemory},
-    vram_alloc::{SimpleVramAllocator, VramMemChunk, get_vram_allocator},
+    sys::{self, CtrlButtons, GuState, sceGuColor, sceGuDrawArray, sceGuGetMemory},
+    vram_alloc::{SimpleVramAllocator, get_vram_allocator},
 };
-
 #[repr(C)]
 struct Vertex {
     pub u: u16,
@@ -101,13 +100,13 @@ impl Renderer {
 
 impl FoamRenderer for Renderer {
     fn clear(&mut self, color: u32) {
-        let new_color = (0xFF << 24) | color;
+        let color = rgb_to_abgr(color);
         unsafe {
             sys::sceGuStart(
                 sys::GuContextType::Direct,
                 &raw mut LIST as *mut _ as *mut c_void,
             );
-            sys::sceGuClearColor(new_color);
+            sys::sceGuClearColor(color);
             sys::sceGuClearDepth(0);
             sys::sceGuClear(
                 sys::ClearBuffer::COLOR_BUFFER_BIT | sys::ClearBuffer::DEPTH_BUFFER_BIT,
@@ -129,8 +128,8 @@ impl FoamRenderer for Renderer {
             ((*vertices.wrapping_add(0)).y) = y;
             ((*vertices.wrapping_add(1)).x) = x + w as i16;
             ((*vertices.wrapping_add(1)).y) = y + h as i16;
-            let new_color = (0xFF << 24) | color;
-            sceGuColor(new_color);
+            let color = rgb_to_abgr(color);
+            sceGuColor(color);
             sceGuDrawArray(
                 sys::GuPrimitive::Sprites,
                 sys::VertexType::TEXTURE_16BIT
@@ -141,5 +140,30 @@ impl FoamRenderer for Renderer {
                 vertices as *const c_void,
             );
         }
+    }
+    fn poll_event(&mut self) -> alloc::vec::Vec<Event> {
+        let mut events: Vec<Event> = Vec::new();
+        unsafe {
+            let mut pad_data = sys::SceCtrlData::default();
+            sys::sceCtrlReadBufferPositive(&mut pad_data, 1);
+            if !pad_data.buttons.is_empty() {
+                use Button::*;
+                use Event::*;
+                if pad_data.buttons.contains(CtrlButtons::UP) {
+                    events.push(Pad(Up));
+                }
+                if pad_data.buttons.contains(CtrlButtons::DOWN) {
+                    events.push(Pad(Down));
+                }
+                if pad_data.buttons.contains(CtrlButtons::RIGHT) {
+                    events.push(Pad(Right));
+                }
+                if pad_data.buttons.contains(CtrlButtons::LEFT) {
+                    events.push(Pad(Left));
+                }
+            }
+        }
+
+        events
     }
 }

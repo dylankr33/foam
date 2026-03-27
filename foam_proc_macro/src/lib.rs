@@ -5,13 +5,16 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{File, Ident, ItemFn, visit_mut::VisitMut};
 
+/// generates necessary `cfg` attribute
 fn modern_tag() -> TokenStream {
     TokenStream::from_str("#[cfg(any(windows, unix))]").unwrap()
 }
+/// generates necessary `cfg` attribute
 fn retro_tag() -> TokenStream {
     TokenStream::from_str("#[cfg(any(target_os = \"psp\"))]").unwrap()
 }
 
+/// Idk how syn works man this just does what it says
 struct ChangeFnName;
 
 impl VisitMut for ChangeFnName {
@@ -20,6 +23,7 @@ impl VisitMut for ChangeFnName {
     }
 }
 
+/// The main entrypoint for a `foam` program.
 #[proc_macro_attribute]
 pub fn foam_main(
     _attr: proc_macro::TokenStream,
@@ -42,6 +46,7 @@ pub fn foam_main(
     output.into()
 }
 
+/// Use for systems that use `std`
 #[proc_macro_attribute]
 pub fn cfg_modern(
     _attr: proc_macro::TokenStream,
@@ -56,6 +61,7 @@ pub fn cfg_modern(
     .into()
 }
 
+/// Use for systems that use `core` and `alloc`
 #[proc_macro_attribute]
 pub fn cfg_retro(
     _attr: proc_macro::TokenStream,

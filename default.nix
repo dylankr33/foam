@@ -40,6 +40,7 @@
         wayland
         libglvnd
         libGL
+        sdl3
       ];
       shellHook = ''
         export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${builtins.toString (pkgs.lib.makeLibraryPath buildInputs)}
@@ -61,6 +62,7 @@
           rust-analyzer
           cargo-psp
           ppsspp
+          vulkan-tools
         ];
       };
     };

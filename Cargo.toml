@@ -5,25 +5,41 @@ edition = "2024"
 
 [dependencies]
 foam_proc_macro = {workspace = true}
-foam_psp.workspace = true
 foam_common.workspace = true
+
+[target.'cfg(target_os = "psp")'.dependencies]
 psp.workspace = true
+foam_psp.workspace = true
+
+[target.'cfg(any(windows,unix))'.dependencies]
+pretty_env_logger.workspace = true
+winit.workspace = true
+foam_vk.workspace = true
+foam_common.workspace = true
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
 
 [workspace]
-members = ["foam_common","foam_proc_macro", "foam_psp"]
+members = ["foam_common","foam_proc_macro", "foam_psp", "foam_vk"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-psp = "0.3.12"
 foam_proc_macro.path = "foam_proc_macro"
-foam_psp.path = "foam_psp"
 foam_common.path = "foam_common"
+foam_psp.path = "foam_psp"
+foam_vk.path = "foam_vk"
 proc-macro2 = "1.0.2"
 quote = "1.0.45"
 syn = { version = "2.0.117", features = ["visit-mut", "full"] }
+psp = "0.3.12"
+winit = "0.29"
+ash = "0.38.0"
+pretty_env_logger = "0.5"
+this_error = "1"
+cgmath = "0.18"
+tobj = { version = "3", features = ["log"] }
+png = "0.17"

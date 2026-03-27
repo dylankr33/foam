@@ -4,5 +4,5 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-psp.workspace = true
 foam_common.workspace = true
+psp.workspace = true
