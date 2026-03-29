@@ -3,4 +3,3 @@ name = "foam_common"
 version.workspace = true
 edition.workspace = true
 
-[dependencies]

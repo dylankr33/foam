@@ -2,7 +2,8 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
+use core::any::Any;
 
 pub enum Button {
     X,
@@ -21,11 +22,27 @@ pub enum Event {
     Pad(Button),
 }
 
-pub trait FoamRenderer {
-    fn clear(&mut self, color: u32);
+#[repr(C)]
+pub struct Vertex {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub u: f32,
+    pub v: f32,
+}
+
+pub trait EventHandler {
+    fn update(&mut self, context: Vec<Event>);
+    fn draw(&self, canvas: &mut dyn FoamCanvas);
+}
+
+pub trait FoamCanvas {
     fn draw_square(&mut self, color: u32, w: u16, h: u16, x: i16, y: i16);
-    fn end_drawing(&mut self);
+}
+
+pub trait FoamBackend {
     fn poll_event(&mut self) -> Vec<Event>;
+    fn draw(&mut self, cb: &dyn Fn(&mut dyn FoamCanvas));
 }
 pub fn rgb_to_abgr(color: u32) -> u32 {
     let b = color & 0xFF;

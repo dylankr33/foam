@@ -1,0 +1,12 @@
+[package]
+name = "foam_gl"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+winit.workspace = true
+foam_common.workspace = true
+cgmath.workspace = true
+gl.workspace = true
+glutin.workspace = true
+glutin-winit.workspace = true

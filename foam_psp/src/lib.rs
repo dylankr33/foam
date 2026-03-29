@@ -1,15 +1,17 @@
 #![no_std]
-
-use core::{error::Error, ffi::c_void};
-
-use alloc::{boxed::Box, vec::Vec};
-use foam_common::{Button, Event, FoamRenderer, rgb_to_abgr};
+use alloc::{
+    boxed::Box,
+    rc::{Rc, Weak},
+    vec::Vec,
+};
+use core::{cell::RefCell, error::Error, ffi::c_void};
+use foam_common::{Button, Event, EventHandler, FoamBackend, FoamCanvas, rgb_to_abgr};
 use psp::{
     BUF_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH,
     sys::{self, CtrlButtons, GuState, sceGuColor, sceGuDrawArray, sceGuGetMemory},
     vram_alloc::{SimpleVramAllocator, get_vram_allocator},
 };
-#[repr(C)]
+#[repr(C, align(4))]
 struct Vertex {
     pub u: u16,
     pub v: u16,
@@ -22,7 +24,18 @@ static mut LIST: psp::Align16<[u32; 0x40000]> = psp::Align16([0; 0x40000]);
 
 extern crate alloc;
 
-pub struct Renderer {
+#[derive(Clone)]
+pub struct PspCanvas {
+    renderer: *mut PspRenderer,
+}
+
+impl FoamCanvas for PspCanvas {
+    fn draw_square(&mut self, color: u32, w: u16, h: u16, x: i16, y: i16) {
+        unsafe { self.renderer.as_mut_unchecked() }.draw_square(color, w, h, x, y);
+    }
+}
+
+pub struct PspRenderer {
     allocator: SimpleVramAllocator,
     /// Framebuffer pointer 0, used as a draw buffer
     fbp0: *mut u8,
@@ -32,7 +45,7 @@ pub struct Renderer {
     zbp: *mut u8,
 }
 
-impl Renderer {
+impl PspRenderer {
     /// Create a new app
     pub fn new() -> Result<Self, Box<dyn Error>> {
         let allocator = get_vram_allocator().unwrap();
@@ -66,7 +79,7 @@ impl Renderer {
     }
 
     /// Initialize the app
-    pub fn init(&mut self) {
+    pub fn init(&self) {
         unsafe {
             sys::sceGuInit();
             sys::sceGuStart(
@@ -98,23 +111,44 @@ impl Renderer {
     }
 }
 
-impl FoamRenderer for Renderer {
-    fn clear(&mut self, color: u32) {
-        let color = rgb_to_abgr(color);
+pub struct PspBackend {
+    renderer: *mut PspRenderer,
+    canvas: PspCanvas,
+}
+
+impl PspBackend {
+    pub fn new() -> Result<Self, Box<dyn Error>> {
+        let renderer = &mut PspRenderer::new()?;
+        renderer.init();
+        let canvas = PspCanvas { renderer };
+        Ok(Self { canvas, renderer })
+    }
+}
+
+impl FoamBackend for PspBackend {
+    fn poll_event(&mut self) -> Vec<Event> {
+        unsafe { self.renderer.as_mut_unchecked() }.poll_event()
+    }
+
+    fn draw(&mut self, cb: &dyn Fn(&mut dyn FoamCanvas)) {
+        unsafe { self.renderer.as_mut_unchecked() }.draw(cb, &mut self.canvas);
+    }
+}
+
+impl PspRenderer {
+    pub fn draw(&mut self, cb: &dyn Fn(&mut dyn FoamCanvas), canvas: &mut dyn FoamCanvas) {
         unsafe {
             sys::sceGuStart(
                 sys::GuContextType::Direct,
                 &raw mut LIST as *mut _ as *mut c_void,
             );
-            sys::sceGuClearColor(color);
+            sys::sceGuClearColor(0xffffffff);
             sys::sceGuClearDepth(0);
             sys::sceGuClear(
                 sys::ClearBuffer::COLOR_BUFFER_BIT | sys::ClearBuffer::DEPTH_BUFFER_BIT,
             );
-        }
-    }
-    fn end_drawing(&mut self) {
-        unsafe {
+            cb(canvas);
+
             sys::sceGuFinish();
             sys::sceGuSync(sys::GuSyncMode::Finish, sys::GuSyncBehavior::Wait);
             sys::sceDisplayWaitVblankStart();
@@ -141,7 +175,7 @@ impl FoamRenderer for Renderer {
             );
         }
     }
-    fn poll_event(&mut self) -> alloc::vec::Vec<Event> {
+    pub fn poll_event(&mut self) -> alloc::vec::Vec<Event> {
         let mut events: Vec<Event> = Vec::new();
         unsafe {
             let mut pad_data = sys::SceCtrlData::default();

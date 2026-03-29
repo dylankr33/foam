@@ -1,13 +1,13 @@
-#![feature(stmt_expr_attributes)]
 #![cfg_attr(target_os = "psp", no_std)]
 
-use foam_common::FoamRenderer;
-pub use foam_common::{Button, Event};
+pub use foam_common::{Button, Event, EventHandler};
+use foam_common::{FoamBackend, FoamCanvas};
 pub use foam_proc_macro::*;
 
 #[cfg_retro]
 extern crate alloc;
 
+/// `std` and `core` types that are used in foam
 pub mod platform {
     #[cfg_retro]
     pub use alloc::{boxed::Box, vec::Vec};
@@ -19,23 +19,15 @@ pub mod platform {
 }
 
 #[cfg(target_os = "psp")]
-use foam_psp::Renderer;
+use foam_psp::PspBackend;
 
 use platform::{Box, Error, Vec};
 #[cfg(any(windows, unix))]
-use winit::{
-    event_loop::EventLoop,
-    window::{Window, WindowBuilder},
-};
-
-pub trait EventHandler {
-    fn update(&mut self, context: Vec<Event>);
-    fn draw(&mut self, context: &mut Box<dyn FoamRenderer>);
-}
+use winit::{event_loop::EventLoop, window::Window};
 
 pub struct App {
     game: Box<dyn EventHandler>,
-    canvas: Box<dyn FoamRenderer>,
+    renderer: Box<dyn FoamBackend>,
     #[cfg(any(windows, unix))]
     event_loop: EventLoop<()>,
     #[cfg(any(windows, unix))]
@@ -44,29 +36,37 @@ pub struct App {
 
 impl App {
     pub fn new(game: Box<dyn EventHandler>) -> Result<Self, Box<dyn Error>> {
-        #[cfg(any(windows, unix))]
-        let (event_loop, window) = {
-            use winit::dpi::LogicalSize;
-
+        #[cfg(feature = "gl")]
+        let (event_loop, window, gl_config) = {
             let event_loop = EventLoop::new()?;
-            let window = WindowBuilder::new()
+            use glutin::config::ConfigTemplateBuilder;
+            use glutin_winit::DisplayBuilder;
+            use winit::{dpi::LogicalSize, window::WindowAttributes};
+            let window_attributes = WindowAttributes::default()
                 .with_title("Foam App")
-                .with_inner_size(LogicalSize::new(800, 800))
-                .build(&event_loop)?;
-            (event_loop, window)
+                .with_min_inner_size(LogicalSize::new(800, 600));
+            let (window, gl_config) = DisplayBuilder::new()
+                .with_window_attributes(Some(window_attributes))
+                .build(&event_loop, ConfigTemplateBuilder::new(), |configs| {
+                    configs
+                        .peekable()
+                        .next()
+                        .expect("Could not find a valid config!")
+                })?;
+            let Some(window) = window else {
+                panic!("Could not make window!")
+            };
+            (event_loop, window, gl_config)
         };
         let renderer = {
             #[cfg(target_os = "psp")]
             {
-                let mut renderer = foam_psp::Renderer::new()?;
-                renderer.init();
+                let mut renderer = foam_psp::PspBackend::new()?;
                 renderer
             }
-            #[cfg(any(windows, unix))]
+            #[cfg(feature = "gl")]
             {
-                pretty_env_logger::init();
-
-                let renderer = foam_vk::VkApp::new(&window)?;
+                let renderer = foam_gl::GlApp::new(&window, gl_config)?;
                 renderer
             }
             #[cfg(not(any(target_os = "psp", windows, unix)))]
@@ -76,7 +76,7 @@ impl App {
         };
         Ok(App {
             game,
-            canvas: Box::from(renderer),
+            renderer: Box::new(renderer),
             #[cfg(any(windows, unix))]
             event_loop,
             #[cfg(any(windows, unix))]
@@ -89,10 +89,8 @@ impl App {
         #[cfg(target_os = "psp")]
         {
             loop {
-                self.game.update(self.canvas.poll_event());
-                self.canvas.clear(0xffffff);
-                self.game.draw(&mut self.canvas);
-                self.canvas.end_drawing();
+                self.game.update(self.renderer.poll_event());
+                self.renderer.draw(&|canvas| self.game.draw(canvas));
             }
         }
         #[cfg(any(windows, unix))]
@@ -103,7 +101,7 @@ impl App {
                 WEvent::WindowEvent { event, .. } => match event {
                     WindowEvent::CloseRequested => elwt.exit(),
                     WindowEvent::RedrawRequested => {
-                        if elwt.exiting() {
+                        if !elwt.exiting() {
                             self.canvas.clear(0xffffff);
                             self.game.draw(&mut self.canvas);
                             self.canvas.end_drawing();

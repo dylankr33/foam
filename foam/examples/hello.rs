@@ -2,9 +2,10 @@
 #![cfg_attr(target_os = "psp", no_main)]
 
 use foam::{
-    App, Button, Event, EventHandler, foam_main,
+    App, Button, Event, EventHandler, foam_main, lprintln,
     platform::{Box, Error, Vec},
 };
+use foam_common::FoamCanvas;
 
 #[derive(Default)]
 struct Game {
@@ -29,9 +30,8 @@ impl EventHandler for Game {
             }
         }
     }
-    fn draw(&mut self, context: &mut Box<dyn foam_common::FoamRenderer>) {
-        context.draw_square(0xaaaaaa, 100, 100, self.x, self.y);
-        context.draw_square(0x223344, 100, 100, 200, 67);
+    fn draw(&self, canvas: &mut dyn FoamCanvas) {
+        canvas.draw_square(0xff00ff, 30, 30, self.x, self.y)
     }
 }
 
