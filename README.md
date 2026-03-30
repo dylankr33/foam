@@ -1,12 +1,9 @@
 # foam!
 
-A simple library to make games with
+An easy-to-use and portable game library
 
-### Supported Platforms
-
-- None
-
-### Platforms Being Worked On:
-
-- PSP
-- Vulkan?
+### Backends
+| Features  | PSP             | Desktop |
+-----------------------------------------
+| Rendering | It can do cubes | None    |
+| Lighting  | None            | None    | 
