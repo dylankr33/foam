@@ -2,33 +2,38 @@
 
 extern crate alloc;
 
+pub mod shapes;
+
 use alloc::{boxed::Box, vec::Vec};
 use core::any::Any;
 
-pub enum Button {
-    X,
-    Y,
-    A,
-    B,
-    Up,
-    Down,
-    Right,
-    Left,
-}
+use crate::prelude::Event;
+pub mod prelude {
+    pub enum Button {
+        X,
+        Y,
+        A,
+        B,
+        Up,
+        Down,
+        Right,
+        Left,
+    }
 
-pub enum Event {
-    Quit,
-    None,
-    Pad(Button),
-}
+    pub enum Event {
+        Quit,
+        None,
+        Pad(Button),
+    }
 
-#[repr(C)]
-pub struct Vertex {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub u: f32,
-    pub v: f32,
+    #[repr(C)]
+    pub struct Vertex {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+        pub u: f32,
+        pub v: f32,
+    }
 }
 
 pub trait EventHandler {
@@ -37,7 +42,7 @@ pub trait EventHandler {
 }
 
 pub trait FoamCanvas {
-    fn draw_square(&mut self, color: u32, w: u16, h: u16, x: i16, y: i16);
+    fn draw_cube(&self, color: u32, position: (f32, f32, f32)) {}
 }
 
 pub trait FoamBackend {

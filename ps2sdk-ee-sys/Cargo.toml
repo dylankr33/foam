@@ -1,0 +1,7 @@
+[package]
+name = "ps2sdk-ee-sys"
+version.workspace = true
+edition.workspace = true
+
+[build-dependencies]
+bindgen.workspace = true

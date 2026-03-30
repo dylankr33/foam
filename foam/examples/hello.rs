@@ -2,28 +2,26 @@
 #![cfg_attr(target_os = "psp", no_main)]
 
 use foam::{
-    App, Button, Event, EventHandler, foam_main, lprintln,
+    App, Button, Event, EventHandler, FoamCanvas, foam_main, lprintln,
     platform::{Box, Error, Vec},
 };
-use foam_common::FoamCanvas;
 
 #[derive(Default)]
 struct Game {
-    x: i16,
-    y: i16,
+    x: f32,
+    y: f32,
 }
 
 impl EventHandler for Game {
     fn update(&mut self, context: Vec<Event>) {
         for event in context {
-            use Button::*;
             use Event::*;
             match event {
                 Pad(button) => match button {
-                    Up => self.y -= 1,
-                    Down => self.y += 1,
-                    Right => self.x += 1,
-                    Left => self.x -= 1,
+                    Button::Up => self.y -= 0.2,
+                    Button::Down => self.y += 0.2,
+                    Button::Right => self.x += 0.2,
+                    Button::Left => self.x -= 0.2,
                     _ => (),
                 },
                 _ => (),
@@ -31,7 +29,7 @@ impl EventHandler for Game {
         }
     }
     fn draw(&self, canvas: &mut dyn FoamCanvas) {
-        canvas.draw_square(0xff00ff, 30, 30, self.x, self.y)
+        canvas.draw_cube(0xff00000, (self.x, -2.0, self.y))
     }
 }
 

@@ -1,7 +1,6 @@
 #![cfg_attr(target_os = "psp", no_std)]
 
-pub use foam_common::{Button, Event, EventHandler};
-use foam_common::{FoamBackend, FoamCanvas};
+pub use foam_common::{EventHandler, FoamBackend, FoamCanvas, prelude::*};
 pub use foam_proc_macro::*;
 
 #[cfg_retro]
@@ -9,11 +8,11 @@ extern crate alloc;
 
 /// `std` and `core` types that are used in foam
 pub mod platform {
+    use super::*;
     #[cfg_retro]
     pub use alloc::{boxed::Box, vec::Vec};
     #[cfg_retro]
     pub use core::error::Error;
-    use foam_proc_macro::*;
     #[cfg_modern]
     pub use std::{boxed::Box, cell::Cell, error::Error, vec::Vec};
 }

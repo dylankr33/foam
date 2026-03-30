@@ -1,0 +1,7 @@
+[package]
+name = "ps2sdk"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ps2sdk-ee-sys.workspace = true

@@ -4,34 +4,71 @@ use alloc::{
     rc::{Rc, Weak},
     vec::Vec,
 };
-use core::{cell::RefCell, error::Error, ffi::c_void};
-use foam_common::{Button, Event, EventHandler, FoamBackend, FoamCanvas, rgb_to_abgr};
+use core::{cell::RefCell, error::Error, ffi::c_void, prelude, ptr};
+use foam_common::{FoamBackend, FoamCanvas, prelude::*, rgb_to_abgr, shapes};
 use psp::{
-    BUF_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH,
-    sys::{self, CtrlButtons, GuState, sceGuColor, sceGuDrawArray, sceGuGetMemory},
+    Align16, BUF_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH,
+    sys::{
+        self, CtrlButtons, GuState, UtilityHtmlViewerOption, VertexType, sceGuColor,
+        sceGuDrawArray, sceGuGetMemory, sceGumDrawArray, sceGumLoadMatrix, sceGumTranslate,
+    },
     vram_alloc::{SimpleVramAllocator, get_vram_allocator},
 };
-#[repr(C, align(4))]
-struct Vertex {
-    pub u: u16,
-    pub v: u16,
-    pub x: i16,
-    pub y: i16,
-    pub z: i16,
+
+const fn vertex_to_psp_vertex<const N: usize>(data: [Vertex; N]) -> [PspVertex; N] {
+    let mut bleh = [const {
+        PspVertex {
+            u: 0.0,
+            v: 0.0,
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }
+    }; N];
+    let mut i = 0;
+    while i < N {
+        bleh[i as usize] = PspVertex {
+            u: data[i as usize].u,
+            v: data[i as usize].v,
+            x: data[i as usize].x,
+            y: data[i as usize].y,
+            z: data[i as usize].z,
+        };
+        i += 1;
+    }
+    bleh
 }
 
+static PSP_CUBE: Align16<[PspVertex; shapes::cube::VERTICES.len()]> =
+    Align16(vertex_to_psp_vertex(shapes::cube::VERTICES));
+
 static mut LIST: psp::Align16<[u32; 0x40000]> = psp::Align16([0; 0x40000]);
+
+#[repr(C, packed)]
+struct PspVertex {
+    u: f32,
+    v: f32,
+    x: f32,
+    y: f32,
+    z: f32,
+}
 
 extern crate alloc;
 
 #[derive(Clone)]
 pub struct PspCanvas {
-    renderer: *mut PspRenderer,
+    renderer: Rc<RefCell<PspRenderer>>,
 }
 
 impl FoamCanvas for PspCanvas {
-    fn draw_square(&mut self, color: u32, w: u16, h: u16, x: i16, y: i16) {
-        unsafe { self.renderer.as_mut_unchecked() }.draw_square(color, w, h, x, y);
+    fn draw_cube(&self, color: u32, position: (f32, f32, f32)) {
+        self.renderer.borrow_mut().draw_mesh(
+            color,
+            Align16(PSP_CUBE.0.as_ptr()),
+            36,
+            ptr::null_mut(),
+            position,
+        );
     }
 }
 
@@ -103,6 +140,12 @@ impl PspRenderer {
             sys::sceGuDepthRange(65535, 0);
             sys::sceGuScissor(0, 0, SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32);
             sys::sceGuEnable(GuState::ScissorTest);
+            sys::sceGuDepthFunc(sys::DepthFunc::Always);
+            sys::sceGuEnable(GuState::DepthTest);
+            sys::sceGuFrontFace(sys::FrontFaceDirection::CounterClockwise);
+            sys::sceGuShadeModel(sys::ShadingModel::Smooth);
+            sys::sceGuDisable(GuState::CullFace);
+            sys::sceGuEnable(GuState::ClipPlanes);
             sys::sceGuFinish();
             sys::sceGuSync(sys::GuSyncMode::Finish, sys::GuSyncBehavior::Wait);
             sys::sceDisplayWaitVblank();
@@ -112,66 +155,108 @@ impl PspRenderer {
 }
 
 pub struct PspBackend {
-    renderer: *mut PspRenderer,
+    renderer: Rc<RefCell<PspRenderer>>,
     canvas: PspCanvas,
 }
 
 impl PspBackend {
     pub fn new() -> Result<Self, Box<dyn Error>> {
-        let renderer = &mut PspRenderer::new()?;
-        renderer.init();
-        let canvas = PspCanvas { renderer };
+        let renderer = Rc::new(RefCell::new(PspRenderer::new()?));
+        renderer.borrow_mut().init();
+        let canvas = PspCanvas {
+            renderer: renderer.clone(),
+        };
         Ok(Self { canvas, renderer })
     }
 }
 
 impl FoamBackend for PspBackend {
     fn poll_event(&mut self) -> Vec<Event> {
-        unsafe { self.renderer.as_mut_unchecked() }.poll_event()
+        self.renderer.borrow_mut().poll_event()
     }
 
     fn draw(&mut self, cb: &dyn Fn(&mut dyn FoamCanvas)) {
-        unsafe { self.renderer.as_mut_unchecked() }.draw(cb, &mut self.canvas);
+        self.renderer.borrow_mut().start_frame();
+        cb(&mut self.canvas);
+        self.renderer.borrow_mut().end_frame();
     }
 }
 
 impl PspRenderer {
-    pub fn draw(&mut self, cb: &dyn Fn(&mut dyn FoamCanvas), canvas: &mut dyn FoamCanvas) {
+    pub fn start_frame(&mut self) {
         unsafe {
             sys::sceGuStart(
                 sys::GuContextType::Direct,
                 &raw mut LIST as *mut _ as *mut c_void,
             );
-            sys::sceGuClearColor(0xffffffff);
-            sys::sceGuClearDepth(0);
+            sys::sceGuClearColor(0xffaaaaaa);
+            sys::sceGuClearDepth(0xffff);
             sys::sceGuClear(
                 sys::ClearBuffer::COLOR_BUFFER_BIT | sys::ClearBuffer::DEPTH_BUFFER_BIT,
             );
-            cb(canvas);
-
+            sys::sceGumMatrixMode(sys::MatrixMode::Projection);
+            sys::sceGumLoadIdentity();
+            sys::sceGumPerspective(75.0, 16.0 / 9.0, 0.5, 1000.0);
+            sys::sceGumMatrixMode(sys::MatrixMode::View);
+            sys::sceGumLoadIdentity();
+        }
+    }
+    pub fn end_frame(&mut self) {
+        unsafe {
             sys::sceGuFinish();
+            sys::sceKernelDcacheWritebackAll();
+
             sys::sceGuSync(sys::GuSyncMode::Finish, sys::GuSyncBehavior::Wait);
             sys::sceDisplayWaitVblankStart();
             sys::sceGuSwapBuffers();
         }
     }
-    fn draw_square(&mut self, color: u32, w: u16, h: u16, x: i16, y: i16) {
+
+    pub fn draw_mesh(
+        &mut self,
+        color: u32,
+        data: Align16<*const PspVertex>,
+        count: i32,
+        indices: *mut u16,
+        pos: (f32, f32, f32),
+    ) {
+        unsafe {
+            sys::sceGumMatrixMode(sys::MatrixMode::Model);
+            sys::sceGumLoadIdentity();
+            sys::sceGumTranslate(&sys::ScePspFVector3 {
+                x: pos.0,
+                y: pos.1,
+                z: pos.2,
+            });
+            let color = rgb_to_abgr(color);
+            sys::sceGuColor(color);
+            sys::sceGumDrawArray(
+                sys::GuPrimitive::Triangles,
+                VertexType::TEXTURE_32BITF | VertexType::VERTEX_32BITF | VertexType::TRANSFORM_3D,
+                count,
+                indices as *mut c_void,
+                data.0 as *const _,
+            );
+        }
+    }
+
+    fn draw_square(&mut self, color: u32, w: f32, h: f32, x: f32, y: f32) {
         unsafe {
             let vertices = sceGuGetMemory(2 * size_of::<Vertex>() as i32) as *mut Vertex;
-            ((*vertices.wrapping_add(0)).x) = x;
-            ((*vertices.wrapping_add(0)).y) = y;
-            ((*vertices.wrapping_add(1)).x) = x + w as i16;
-            ((*vertices.wrapping_add(1)).y) = y + h as i16;
+            (*vertices.wrapping_add(0)).x = x;
+            (*vertices.wrapping_add(0)).y = y;
+            (*vertices.wrapping_add(1)).x = x;
+            (*vertices.wrapping_add(1)).y = y;
             let color = rgb_to_abgr(color);
             sceGuColor(color);
-            sceGuDrawArray(
+            sceGumDrawArray(
                 sys::GuPrimitive::Sprites,
-                sys::VertexType::TEXTURE_16BIT
-                    | sys::VertexType::VERTEX_16BIT
-                    | sys::VertexType::TRANSFORM_2D,
+                sys::VertexType::TEXTURE_32BITF
+                    | sys::VertexType::VERTEX_32BITF
+                    | sys::VertexType::TRANSFORM_3D,
                 2,
                 0 as *const _,
-                vertices as *const c_void,
+                vertices as *mut c_void,
             );
         }
     }

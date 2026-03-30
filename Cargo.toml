@@ -3,7 +3,9 @@ members = [
   "foam",
   "foam_common",
   "foam_proc_macro",
-  "foam_psp"
+  "foam_psp",
+  "foam_gl",
+  "ps2sdk-ee-sys", "ps2sdk",
 ]
 resolver = "3"
 
@@ -12,6 +14,8 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
+ps2sdk-ee-sys.path = "ps2sdk-ee-sys"
+ps2sdk.path = "ps2sdk"
 foam_proc_macro.path = "foam_proc_macro"
 foam_common.path = "foam_common"
 foam_psp.path = "foam_psp"
@@ -28,3 +32,4 @@ cgmath = "0.18"
 glutin-winit = "0.5.0"
 tobj = { version = "3", features = ["log"] }
 png = "0.17"
+bindgen = "0.72.1"
